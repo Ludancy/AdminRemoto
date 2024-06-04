@@ -1,6 +1,5 @@
 package com.example.miprimerapp
 
-
 import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.util.Log
@@ -16,13 +15,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,17 +40,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.InputStream
-import java.io.OutputStream
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.NetworkInterface
-import java.net.ServerSocket
-import java.net.Socket
 import java.net.SocketException
-import java.net.SocketTimeoutException
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,7 +63,6 @@ fun MyApp() {
     val navController = rememberNavController()
     NavHost(navController, startDestination = "screen1") {
         composable("screen1") { Screen1(navController) }
-        composable("screen2") { Screen2(navController) }
     }
 }
 
@@ -85,7 +76,7 @@ fun Screen1(navController: androidx.navigation.NavHostController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Pantalla 1") },
+                title = {Text("Pantalla 1", onTextLayout = {}) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color(0xFF6200EE),
                     titleContentColor = Color.White
@@ -104,10 +95,15 @@ fun Screen1(navController: androidx.navigation.NavHostController) {
             Text(
                 text = "Bienvenido a la Pantalla 1",
                 fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                onTextLayout = {}
             )
             Spacer(modifier = Modifier.height(16.dp))
-            Text(text = connectionStatus)
+            Text(
+                text = connectionStatus,
+                onTextLayout = {}
+            )
+
             Spacer(modifier = Modifier.height(16.dp))
             Button(onClick = {
                 discoverAndReceiveImage(localIp) { status, image ->
@@ -115,7 +111,11 @@ fun Screen1(navController: androidx.navigation.NavHostController) {
                     receivedImage = image
                 }
             }) {
-                Text("Recibir Captura de Pantalla")
+                Text(
+                    text = "Recibir Captura de Pantalla",
+                    onTextLayout = {}
+                )
+
             }
             Spacer(modifier = Modifier.height(16.dp))
             receivedImage?.let {
@@ -123,7 +123,11 @@ fun Screen1(navController: androidx.navigation.NavHostController) {
             }
             Spacer(modifier = Modifier.height(16.dp))
             Button(onClick = { navController.navigate("screen2") }) {
-                Text("Ir a Pantalla 2")
+                Text(
+                    text = "Ir a Pantalla 2",
+                    onTextLayout = {}
+                )
+
             }
         }
     }
@@ -169,7 +173,7 @@ private fun discoverAndReceiveImage(localIp: String?, updateStatusAndImage: (Str
                         updateStatusAndImage("Descubierto el propio dispositivo, no se recibe la captura de pantalla", null)
                     }
                 }
-            } catch (e: SocketTimeoutException) {
+            } catch (e: java.net.SocketTimeoutException) {
                 withContext(Dispatchers.Main) {
                     updateStatusAndImage("No se encontró ningún servidor que enviara la captura de pantalla", null)
                 }
@@ -181,200 +185,6 @@ private fun discoverAndReceiveImage(localIp: String?, updateStatusAndImage: (Str
             withContext(Dispatchers.Main) {
                 updateStatusAndImage("Error en la detección y recepción de la captura de pantalla: ${e.message}", null)
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun Screen2(navController: androidx.navigation.NavHostController) {
-    var connectionStatus by remember { mutableStateOf("Not Connected") }
-    var message by remember { mutableStateOf("") }
-    var receivedMessage by remember { mutableStateOf("") }
-    val localIp by remember { mutableStateOf(getLocalIpAddress()) }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Pantalla 2") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF03DAC5),
-                    titleContentColor = Color.Black
-                )
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Bienvenido a la Pantalla 2",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text = connectionStatus)
-            Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(
-                value = message,
-                onValueChange = { message = it },
-                label = { Text("Mensaje") }
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = {
-                discoverAndSendMessage(localIp, message) { status ->
-                    connectionStatus = status
-                }
-            }) {
-                Text("Enviar Mensaje")
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text = "Mensaje Recibido: $receivedMessage")
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = { navController.navigate("screen1") }) {
-                Text("Ir a Pantalla 1")
-            }
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        startServer(localIp) { msg ->
-            receivedMessage = msg
-        }
-    }
-}
-
-private fun discoverAndSendMessage(localIp: String?, message: String, updateStatus: (String) -> Unit) {
-    CoroutineScope(Dispatchers.IO).launch {
-        try {
-            val broadcastAddress = InetAddress.getByName("255.255.255.255")
-            val discoveryPort = 8888
-            val socket = DatagramSocket()
-            socket.broadcast = true
-
-            val sendData = "DISCOVER_REQUEST".toByteArray()
-            val sendPacket = DatagramPacket(sendData, sendData.size, broadcastAddress, discoveryPort)
-            socket.send(sendPacket)
-
-            val receiveData = ByteArray(1024)
-            val receivePacket = DatagramPacket(receiveData, receiveData.size)
-            socket.soTimeout = 5000 // 5 segundos de tiempo de espera
-
-            try {
-                socket.receive(receivePacket)
-                val serverIp = receivePacket.address.hostAddress
-                Log.d("NetworkNotification", "Servidor encontrado en $serverIp")
-
-                if (serverIp != localIp) {
-                    // Enviar mensaje al servidor descubierto
-                    if (serverIp != null) {
-                        connectAndSendMessage(serverIp, 8080, message, localIp, updateStatus)
-                    }
-                } else {
-                    withContext(Dispatchers.Main) {
-                        updateStatus("Descubierto el propio dispositivo, no se envía el mensaje.")
-                    }
-                }
-            } catch (e: SocketTimeoutException) {
-                withContext(Dispatchers.Main) {
-                    updateStatus("No se encontró ningún servidor.")
-                }
-            }
-
-            socket.close()
-        } catch (e: Exception) {
-            Log.e("NetworkNotification", "Error en la detección y envío del mensaje", e)
-            withContext(Dispatchers.Main) {
-                updateStatus("Error en la detección y envío del mensaje: ${e.message}")
-            }
-        }
-    }
-}
-
-private fun connectAndSendMessage(ip: String, port: Int, message: String, localIp: String?, updateStatus: (String) -> Unit) {
-    CoroutineScope(Dispatchers.IO).launch {
-        var socket: Socket? = null
-        try {
-            Log.d("NetworkNotification", "Intentando conectar a $ip:$port desde $localIp")
-            socket = Socket(ip, port)
-            val output: OutputStream = socket.getOutputStream()
-            val fullMessage = "From $localIp: $message"
-            output.write(fullMessage.toByteArray())
-            output.flush()
-            withContext(Dispatchers.Main) {
-                updateStatus("Mensaje enviado correctamente a $ip")
-                Log.d("NetworkNotification", "Mensaje enviado correctamente a $ip")
-            }
-        } catch (e: Exception) {
-            Log.e("NetworkNotification", "Error al enviar el mensaje a $ip", e)
-            withContext(Dispatchers.Main) {
-                updateStatus("Error al enviar el mensaje a $ip: ${e.message}")
-            }
-        } finally {
-            socket?.close()
-        }
-    }
-}
-
-private fun startServer(localIp: String?, onMessageReceived: (String) -> Unit) {
-    CoroutineScope(Dispatchers.IO).launch {
-        var serverSocket: ServerSocket? = null
-        try {
-            Log.d("NetworkNotification", "Servidor iniciado, esperando conexiones...")
-            serverSocket = ServerSocket(8080)
-
-            // Hilo para escuchar descubrimientos de clientes
-            val discoveryPort = 8888
-            CoroutineScope(Dispatchers.IO).launch {
-                var discoverySocket: DatagramSocket? = null
-                try {
-                    discoverySocket = DatagramSocket(discoveryPort)
-                    while (true) {
-                        val receiveData = ByteArray(1024)
-                        val receivePacket = DatagramPacket(receiveData, receiveData.size)
-                        discoverySocket.receive(receivePacket)
-
-                        if (receivePacket.address.hostAddress != localIp) {
-                            val sendData = "DISCOVER_RESPONSE".toByteArray()
-                            val sendPacket = DatagramPacket(sendData, sendData.size, receivePacket.address, receivePacket.port)
-                            discoverySocket.send(sendPacket)
-
-                            Log.d("NetworkNotification", "Respuesta de descubrimiento enviada a ${receivePacket.address.hostAddress}")
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e("NetworkNotification", "Error en la respuesta de descubrimiento", e)
-                } finally {
-                    discoverySocket?.close()
-                }
-            }
-
-            while (true) {
-                var clientSocket: Socket? = null
-                try {
-                    clientSocket = serverSocket.accept()
-                    Log.d("NetworkNotification", "Conexión aceptada de ${clientSocket.inetAddress.hostAddress}")
-                    val input: InputStream = clientSocket.getInputStream()
-                    val message = input.bufferedReader().readLine()
-                    withContext(Dispatchers.Main) {
-                        onMessageReceived(message)
-                        Log.d("NetworkNotification", "Mensaje recibido: $message")
-                    }
-                } catch (e: Exception) {
-                    Log.e("NetworkNotification", "Error en el servidor", e)
-                } finally {
-                    clientSocket?.close()
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("NetworkNotification", "Error en el servidor", e)
-        } finally {
-            serverSocket?.close()
         }
     }
 }
